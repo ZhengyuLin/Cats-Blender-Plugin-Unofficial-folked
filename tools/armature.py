@@ -4,6 +4,8 @@ import bpy
 import copy
 import math
 from mathutils import Matrix
+import json
+import os
 
 from . import common as Common
 from . import material as Material
@@ -17,6 +19,11 @@ from .translations import t
 from mmd_tools_local.operators import morph as Morph
 mmd_tools_local_installed = True
 
+bone_translated_names = {}
+def set_bone_dict(oldname, newname):
+    for key in bone_translated_names:
+        if bone_translated_names[key] == oldname:
+            bone_translated_names[key] = newname
 
 @register_wrap
 class FixArmature(bpy.types.Operator):
@@ -218,6 +225,7 @@ class FixArmature(bpy.types.Operator):
             if bone.name.startswith("cShrugger"):
                 for bone in armature.pose.bones:
                     if bone.name == "Spine1":
+                        # change bone.name
                         bone.name = "Hips"
                         break
                 break
@@ -429,8 +437,11 @@ class FixArmature(bpy.types.Operator):
             bone.hide = False
             to_translate.append(bone.name)
         Translate.update_dictionary(to_translate)
+        
         for bone in armature.data.bones:
-            bone.name, translated = Translate.translate(bone.name)
+            new_translated_name, translated = Translate.translate(bone.name)
+            bone_translated_names[bone.name] = new_translated_name
+            bone.name = new_translated_name
 
         # Armature should be selected
         Common.set_default_stage()
@@ -608,6 +619,8 @@ class FixArmature(bpy.types.Operator):
             if name[-4:] == '_Jnt':
                 name = name[:-4]
 
+            # change bone name
+            set_bone_dict(bone.name, name)
             bone.name = name
 
         # Add conflicting bone names to new list
@@ -664,10 +677,12 @@ class FixArmature(bpy.types.Operator):
 
             # Rename only if all required bones are found
             if found_all:
+                set_bone_dict(bone.name, names[2])
                 bone.name = names[2]
 
         # Standardize bone names again (new duplicate bones have ".001" in it)
         for bone in armature.data.edit_bones:
+            set_bone_dict(bone.name, bone.name.replace('.', '_'))
             bone.name = bone.name.replace('.', '_')
 
         # Rename all the bones
@@ -712,6 +727,7 @@ class FixArmature(bpy.types.Operator):
                     # Rename the bone
                     if bone[0] not in armature.data.edit_bones:
                         # print(bone_final.name, '>', bone[0])
+                        set_bone_dict(bone_final.name, bone[0])
                         bone_final.name = bone[0]
 
         # Check if it is a mixamo model
@@ -729,9 +745,11 @@ class FixArmature(bpy.types.Operator):
                     continue
                 if parent.name == key or parent.name == key.lower():
                     if 'right' in bone.name.lower():
+                        set_bone_dict(parent.name, 'Right ' + value)
                         parent.name = 'Right ' + value
                         break
                     elif 'left' in bone.name.lower():
+                        set_bone_dict(parent.name, 'Left ' + value)
                         parent.name = 'Left ' + value
                         break
 
@@ -740,9 +758,11 @@ class FixArmature(bpy.types.Operator):
                     continue
                 if parent.name == key or parent.name == key.lower():
                     if 'right' in bone.name.lower():
+                        set_bone_dict(parent.name, 'Right ' + value)
                         parent.name = 'Right ' + value
                         break
                     elif 'left' in bone.name.lower():
+                        set_bone_dict(parent.name, 'Left ' + value)
                         parent.name = 'Left ' + value
                         break
 
@@ -773,6 +793,7 @@ class FixArmature(bpy.types.Operator):
         # Fix spines from armatures with no upper body (like skirts)
         if len(spine_parts) == 1 and not armature.data.edit_bones.get('Neck'):
             if spine_count == 0:
+                set_bone_dict(armature.data.edit_bones.get(spine_parts[0]).name, 'Spine')
                 armature.data.edit_bones.get(spine_parts[0]).name = 'Spine'
             else:
                 spines.append(spine_parts[0])
@@ -793,6 +814,8 @@ class FixArmature(bpy.types.Operator):
                 chest_top = spine.tail
 
             # Correct the names
+            set_bone_dict(spine.name, 'Spine')
+            set_bone_dict(chest.name, 'Chest')
             spine.name = 'Spine'
             chest.name = 'Chest'
 
@@ -814,11 +837,16 @@ class FixArmature(bpy.types.Operator):
 
         elif spine_count == 2:  # Everything correct, just rename them
             print('NORMAL')
+            set_bone_dict(armature.data.edit_bones.get(spines[0]).name, 'Spine')
+            set_bone_dict(armature.data.edit_bones.get(spines[1]).name, 'Chest')
             armature.data.edit_bones.get(spines[0]).name = 'Spine'
             armature.data.edit_bones.get(spines[1]).name = 'Chest'
 
         elif spine_count == 3:  # Everything correct, just rename them
             print('NORMAL')
+            set_bone_dict(armature.data.edit_bones.get(spines[0]).name, 'Spine')
+            set_bone_dict(armature.data.edit_bones.get(spines[1]).name, 'Chest')
+            set_bone_dict(armature.data.edit_bones.get(spines[2]).name, 'Upper Chest')
             armature.data.edit_bones.get(spines[0]).name = 'Spine'
             armature.data.edit_bones.get(spines[1]).name = 'Chest'
             armature.data.edit_bones.get(spines[2]).name = 'Upper Chest'
@@ -827,7 +855,9 @@ class FixArmature(bpy.types.Operator):
             print('SOURCE ENGINE')
             spine = armature.data.edit_bones.get(spines[0])
             chest = armature.data.edit_bones.get(spines[2])
-
+            
+            set_bone_dict(spine.name, 'Spine')
+            set_bone_dict(chest.name, 'Chest')
             chest.name = 'Chest'
             spine.name = 'Spine'
 
@@ -843,6 +873,8 @@ class FixArmature(bpy.types.Operator):
             chest = armature.data.edit_bones.get(spines[spine_count - 1])
 
             # Correct names
+            set_bone_dict(spine.name, 'Spine')
+            set_bone_dict(chest.name, 'Chest')
             spine.name = 'Spine'
             chest.name = 'Chest'
 
@@ -1246,6 +1278,17 @@ class FixArmature(bpy.types.Operator):
             return {'FINISHED'}
 
         saved_data.load()
+
+        try:
+            json_filename = f"name_maps.json"
+            json_path = os.path.join(os.getcwd(), json_filename)
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(bone_translated_names, f, indent=2, ensure_ascii=False)
+
+            print('Saved name maps to: %s', json_path)
+
+        except Exception as e:
+            print('Failed to save name maps: %s', str(e))
 
         self.report({'INFO'}, t('FixArmature.fixedSuccess'))
         return {'FINISHED'}

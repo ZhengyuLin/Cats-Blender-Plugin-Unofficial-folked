@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from typing import TYPE_CHECKING, List, Optional
+import json
 
 import bpy
 from mathutils import Matrix, Vector
@@ -467,10 +468,32 @@ class PMXImporter:
         self.__rigidTable = {}
         context = FnContext.ensure_context()
         rigid_pool = FnRigidBody.new_rigid_body_objects(context, FnModel.ensure_rigid_group_object(context, self.__rig.rootObject()), len(self.__model.rigids))
+        
+        rigids_meta = [] # edited code
         for i, (rigid, rigid_obj) in enumerate(zip(self.__model.rigids, rigid_pool)):
             loc = Vector(rigid.location).xzy * self.__scale
             rot = Vector(rigid.rotation).xzy * -1
             size = Vector(rigid.size).xzy if rigid.type == pmx.Rigid.TYPE_BOX else Vector(rigid.size)
+            
+            rigid_meta = {
+                'name': rigid.name,
+                'englishName': rigid.name_e,
+                'boneIndex': rigid.bone,
+                'boneName': self.__model.bones[rigid.bone].name,
+                'collisionGroup': rigid.collision_group_number,
+                'collisionMask': rigid.collision_group_mask,
+                'shapeType': rigid.type,
+                'shapeSize': rigid.size,
+                'shapePosition': rigid.location,
+                'shapeRotation': rigid.rotation,
+                'mass': rigid.mass,
+                'linearDamping': rigid.velocity_attenuation,
+                'angularDamping': rigid.rotation_attenuation,
+                'repulsion': rigid.bounce,
+                'friction': rigid.friction,
+                'physicsMode': rigid.mode
+            }
+            rigids_meta.append(rigid_meta)
 
             obj = FnRigidBody.setup_rigid_body_object(
                 obj=rigid_obj,
@@ -494,15 +517,63 @@ class PMXImporter:
             MoveObject.set_index(obj, i)
             self.__rigidTable[i] = obj
 
+        try:
+            # Create filename based on model name
+            json_filename = f"rigids_meta.json"
+            json_path = os.path.join(os.getcwd(), json_filename)
+            
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(rigids_meta, f, indent=2, ensure_ascii=False)
+            
+            logging.info('Saved rigids metadata to: %s', json_path)
+            
+        except Exception as e:
+            logging.warning('Failed to save rigids metadata: %s', str(e))
+
         logging.debug("Finished importing rigid bodies in %f seconds.", time.time() - start_time)
 
     def __importJoints(self):
         start_time = time.time()
         context = FnContext.ensure_context()
         joint_pool = FnRigidBody.new_joint_objects(context, FnModel.ensure_joint_group_object(context, self.__rig.rootObject()), len(self.__model.joints), FnModel.get_empty_display_size(self.__rig.rootObject()))
+        
+        joints_meta = []
         for i, (joint, joint_obj) in enumerate(zip(self.__model.joints, joint_pool)):
             loc = Vector(joint.location).xzy * self.__scale
             rot = Vector(joint.rotation).xzy * -1
+
+            position = [loc[0], loc[1], loc[2]]
+            rotation = [rot[0], rot[1], rot[2]]
+            position_min = Vector(joint.minimum_location).xzy * self.__scale
+            position_min = [position_min[0], position_min[1], position_min[2]]
+            position_max = Vector(joint.maximum_location).xzy * self.__scale
+            position_max = [position_max[0], position_max[1], position_max[2]]
+            rotation_min = Vector(joint.minimum_rotation).xzy * -1
+            rotation_min = [rotation_min[0], rotation_min[1], rotation_min[2]]
+            rotation_max = Vector(joint.maximum_rotation).xzy * -1
+            rotation_max = [rotation_max[0], rotation_max[1], rotation_max[2]]
+            spring_position = Vector(joint.spring_constant).xzy
+            spring_position = [spring_position[0], spring_position[1], spring_position[2]]
+            spring_rotation = Vector(joint.spring_rotation_constant).xzy
+            spring_rotation = [spring_rotation[0], spring_rotation[1], spring_rotation[2]]
+
+            joint_meta = {
+                'name': joint.name,
+                'englishName': joint.name_e,
+                'rigidbodyIndexA': joint.src_rigid,
+                'rigidbodyNameA': self.__model.rigids[joint.src_rigid].name,
+                'rigidbodyIndexB': joint.dest_rigid,
+                'rigidbodyNameB': self.__model.rigids[joint.dest_rigid].name,
+                'position': position,
+                'rotation': rotation,
+                'positionMin': position_min,
+                'positionMax': position_max,
+                'rotationMin': rotation_min,
+                'rotationMax': rotation_max,
+                'springPosition': spring_position,
+                'springRotation': spring_rotation,
+            }
+            joints_meta.append(joint_meta)
 
             obj = FnRigidBody.setup_joint_object(
                 obj=joint_obj,
@@ -521,6 +592,18 @@ class PMXImporter:
             )
             obj.hide_set(True)
             MoveObject.set_index(obj, i)
+
+        try:
+            # Create filename based on model name
+            json_filename = "joints_meta.json"
+            json_path = os.path.join(os.getcwd(), json_filename)
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(joints_meta, f, indent=2, ensure_ascii=False)
+
+            logging.info('Saved joints metadata to: %s', json_path)
+
+        except Exception as e:
+            logging.warning('Failed to save joints metadata: %s', str(e))
 
         logging.debug("Finished importing joints in %f seconds.", time.time() - start_time)
 

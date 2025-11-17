@@ -116,7 +116,7 @@ class ImportAnyModel(bpy.types.Operator, bpy_extras.io_utils.ImportHelper):
                                             files=[{'name': file_name}],
                                             directory=directory,
                                             scale=0.08,
-                                            types={'MESH', 'ARMATURE', 'MORPHS', 'DISPLAY'},
+                                            types={'MESH', 'ARMATURE', 'MORPHS', 'DISPLAY', 'PHYSICS'},
                                             log_level='WARNING')
             except AttributeError:
                 bpy.ops.mmd_tools_local.import_model('INVOKE_DEFAULT')
@@ -433,7 +433,7 @@ class ImportMMD(bpy.types.Operator):
         try:
             bpy.ops.mmd_tools_local.import_model('INVOKE_DEFAULT',
                                            scale=0.08,
-                                           types={'MESH', 'ARMATURE', 'MORPHS', 'DISPLAY'},
+                                           types={'MESH', 'ARMATURE', 'MORPHS', 'DISPLAY', 'PHYSICS'},
                                            log_level='WARNING')
         except AttributeError:
             bpy.ops.cats_importer.enable_mmd('INVOKE_DEFAULT')
