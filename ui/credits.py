@@ -27,6 +27,12 @@ class CreditsPanel(ToolPanel, bpy.types.Panel):
 
         box.separator(factor=0.5)
 
+        extra_box = box.box()
+        row = extra_box.row(align=True)
+        row.scale_y = 1.2
+        row.label(text='This is an unofficial version of the Cats Blender Plugin with physics properties json files.')
+        box.separator(factor=0.5)
+
         # Current maintainers info
         info_box = box.box()
         info_col = info_box.column(align=True)
